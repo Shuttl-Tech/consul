@@ -52,6 +52,8 @@ type BootstrapConfig struct {
 	// HCPMetricsBindPort is an int that configures a local listener port
 	// where Envoy will forward metrics. These metrics get pushed to the HCP Metrics
 	// collector to show service mesh metrics on HCP.
+	// This flag is relevant to dynamic xDS configuration as well so it
+	// is also present in the hcpMetricsConfig type of agent/proxycfg/connect_proxy.go.
 	HCPMetricsBindPort int `mapstructure:"envoy_hcp_metrics_bind_port"`
 
 	// PrometheusBindAddr configures an <ip>:<port> on which the Envoy will listen

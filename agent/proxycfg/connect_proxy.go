@@ -8,7 +8,9 @@ import (
 	cachetype "github.com/hashicorp/consul/agent/cache-types"
 	"github.com/hashicorp/consul/agent/proxycfg/internal/watch"
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/proto/private/pbpeering"
+	"github.com/mitchellh/mapstructure"
 )
 
 type handlerConnectProxy struct {
@@ -101,6 +103,37 @@ func (s *handlerConnectProxy) initialize(ctx context.Context) (ConfigSnapshot, e
 	}, svcChecksWatchIDPrefix+structs.ServiceIDString(s.proxyCfg.DestinationServiceID, &s.proxyID.EnterpriseMeta), s.ch)
 	if err != nil {
 		return snap, err
+	}
+
+	hcpCfg, err := parseHCPMetricsConfig(s.proxyCfg.Config)
+	if err != nil {
+		s.logger.Error("failed to parse connect.proxy.config", "error", err)
+	}
+
+	if hcpCfg.HCPMetricsBindPort != 0 {
+		upstream := structs.Upstream{
+			DestinationNamespace: "",
+			DestinationPartition: s.proxyID.PartitionOrDefault(),
+			DestinationName:      api.HCPMetricsCollectorName,
+			LocalBindPort:        hcpCfg.HCPMetricsBindPort,
+			Config: map[string]interface{}{
+				"protocol": "grpc",
+			},
+		}
+		uid := NewUpstreamID(&upstream)
+		snap.ConnectProxy.UpstreamConfig[uid] = &upstream
+
+		err := s.dataSources.CompiledDiscoveryChain.Notify(ctx, &structs.DiscoveryChainRequest{
+			Datacenter:           s.source.Datacenter,
+			QueryOptions:         structs.QueryOptions{Token: s.token},
+			Name:                 upstream.DestinationName,
+			EvaluateInDatacenter: s.source.Datacenter,
+			EvaluateInNamespace:  upstream.DestinationNamespace,
+			EvaluateInPartition:  upstream.DestinationPartition,
+		}, "discovery-chain:"+uid.String(), s.ch)
+		if err != nil {
+			return snap, fmt.Errorf("failed to watch discovery chain for %s: %v", uid.String(), err)
+		}
 	}
 
 	if s.proxyCfg.Mode == structs.ProxyModeTransparent {
@@ -613,4 +646,30 @@ func (s *handlerConnectProxy) handleUpdate(ctx context.Context, u UpdateEvent, s
 		return (*handlerUpstreams)(s).handleUpdateUpstreams(ctx, u, snap)
 	}
 	return nil
+}
+
+// hcpMetricsConfig represents the basic opaque config values for pushing telemetry to HCP.
+type hcpMetricsConfig struct {
+	// HCPMetricsBindPort is an int that configures a local listener port
+	// where Envoy will forward metrics. These metrics get pushed to the HCP Metrics
+	// collector to show service mesh metrics on HCP.
+	// This flag is relevant to bootstrap configuration as well so it
+	// is also present in the BootstrapConfig type of command/connect/envoy/bootstrap_config.go.
+	HCPMetricsBindPort int `mapstructure:"envoy_hcp_metrics_bind_port"`
+}
+
+func parseHCPMetricsConfig(m map[string]interface{}) (hcpMetricsConfig, error) {
+	var cfg hcpMetricsConfig
+	err := mapstructure.WeakDecode(m, &cfg)
+
+	if err != nil {
+		return cfg, fmt.Errorf("failed to decode: %w", err)
+	}
+	if cfg.HCPMetricsBindPort < 0 || cfg.HCPMetricsBindPort > 65535 {
+		err := fmt.Errorf("invalid envoy_hcp_metrics_bind_port: %d", cfg.HCPMetricsBindPort)
+		cfg.HCPMetricsBindPort = 0
+		return cfg, err
+	}
+
+	return cfg, nil
 }

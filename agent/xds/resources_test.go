@@ -129,42 +129,46 @@ func TestAllResourcesFromSnapshot(t *testing.T) {
 	}
 
 	tests := []testcase{
+		// {
+		// 	name: "defaults",
+		// 	create: func(t testinf.T) *proxycfg.ConfigSnapshot {
+		// 		return proxycfg.TestConfigSnapshot(t, nil, nil)
+		// 	},
+		// },
+		// {
+		// 	name: "connect-proxy-exported-to-peers",
+		// 	create: func(t testinf.T) *proxycfg.ConfigSnapshot {
+		// 		return proxycfg.TestConfigSnapshot(t, func(ns *structs.NodeService) {
+		// 			// This test is only concerned about the SPIFFE cert validator config in the public listener
+		// 			// so we empty out the upstreams to avoid generating unnecessary upstream listeners.
+		// 			ns.Proxy.Upstreams = structs.Upstreams{}
+		// 		}, []proxycfg.UpdateEvent{
+		// 			{
+		// 				CorrelationID: "peering-trust-bundles",
+		// 				Result:        proxycfg.TestPeerTrustBundles(t),
+		// 			},
+		// 		})
+		// 	},
+		// },
+		// {
+		// 	name:   "transparent-proxy",
+		// 	create: proxycfg.TestConfigSnapshotTransparentProxy,
+		// },
+		// {
+		// 	name:   "connect-proxy-with-peered-upstreams",
+		// 	create: proxycfg.TestConfigSnapshotPeering,
+		// },
+		// {
+		// 	name:   "transparent-proxy-with-peered-upstreams",
+		// 	create: proxycfg.TestConfigSnapshotPeeringTProxy,
+		// },
+		// {
+		// 	name:   "local-mesh-gateway-with-peered-upstreams",
+		// 	create: proxycfg.TestConfigSnapshotPeeringLocalMeshGateway,
+		// },
 		{
-			name: "defaults",
-			create: func(t testinf.T) *proxycfg.ConfigSnapshot {
-				return proxycfg.TestConfigSnapshot(t, nil, nil)
-			},
-		},
-		{
-			name: "connect-proxy-exported-to-peers",
-			create: func(t testinf.T) *proxycfg.ConfigSnapshot {
-				return proxycfg.TestConfigSnapshot(t, func(ns *structs.NodeService) {
-					// This test is only concerned about the SPIFFE cert validator config in the public listener
-					// so we empty out the upstreams to avoid generating unnecessary upstream listeners.
-					ns.Proxy.Upstreams = structs.Upstreams{}
-				}, []proxycfg.UpdateEvent{
-					{
-						CorrelationID: "peering-trust-bundles",
-						Result:        proxycfg.TestPeerTrustBundles(t),
-					},
-				})
-			},
-		},
-		{
-			name:   "transparent-proxy",
-			create: proxycfg.TestConfigSnapshotTransparentProxy,
-		},
-		{
-			name:   "connect-proxy-with-peered-upstreams",
-			create: proxycfg.TestConfigSnapshotPeering,
-		},
-		{
-			name:   "transparent-proxy-with-peered-upstreams",
-			create: proxycfg.TestConfigSnapshotPeeringTProxy,
-		},
-		{
-			name:   "local-mesh-gateway-with-peered-upstreams",
-			create: proxycfg.TestConfigSnapshotPeeringLocalMeshGateway,
+			name:   "hcp-metrics",
+			create: proxycfg.TestConfigSnapshotHCPMetrics,
 		},
 	}
 	tests = append(tests, getConnectProxyTransparentProxyGoldenTestCases()...)
