@@ -20,7 +20,6 @@ import (
 	envoy_http_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	envoy_tcp_proxy_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tcp_proxy/v3"
 	envoy_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
-	envoy_type_v3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -1480,10 +1479,6 @@ func makeHTTPFilter(opts listenerFilterOpts) (*envoy_listener_v3.Filter, error) 
 			},
 		},
 		Tracing: &envoy_http_v3.HttpConnectionManager_Tracing{
-			// Don't trace any requests by default unless the client application
-			// explicitly propagates trace headers that indicate this should be
-			// sampled.
-			RandomSampling: &envoy_type_v3.Percent{Value: 0.0},
 		},
 	}
 
