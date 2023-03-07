@@ -105,35 +105,8 @@ func (s *handlerConnectProxy) initialize(ctx context.Context) (ConfigSnapshot, e
 		return snap, err
 	}
 
-	hcpCfg, err := parseHCPMetricsConfig(s.proxyCfg.Config)
-	if err != nil {
-		s.logger.Error("failed to parse connect.proxy.config", "error", err)
-	}
-
-	if hcpCfg.HCPMetricsBindPort != 0 {
-		upstream := structs.Upstream{
-			DestinationNamespace: "",
-			DestinationPartition: s.proxyID.PartitionOrDefault(),
-			DestinationName:      api.HCPMetricsCollectorName,
-			LocalBindPort:        hcpCfg.HCPMetricsBindPort,
-			Config: map[string]interface{}{
-				"protocol": "grpc",
-			},
-		}
-		uid := NewUpstreamID(&upstream)
-		snap.ConnectProxy.UpstreamConfig[uid] = &upstream
-
-		err := s.dataSources.CompiledDiscoveryChain.Notify(ctx, &structs.DiscoveryChainRequest{
-			Datacenter:           s.source.Datacenter,
-			QueryOptions:         structs.QueryOptions{Token: s.token},
-			Name:                 upstream.DestinationName,
-			EvaluateInDatacenter: s.source.Datacenter,
-			EvaluateInNamespace:  upstream.DestinationNamespace,
-			EvaluateInPartition:  upstream.DestinationPartition,
-		}, "discovery-chain:"+uid.String(), s.ch)
-		if err != nil {
-			return snap, fmt.Errorf("failed to watch discovery chain for %s: %v", uid.String(), err)
-		}
+	if err := s.maybeInitializeHCPMetricsWatches(ctx, snap); err != nil {
+		return snap, fmt.Errorf("failed to initialize HCP metrics watches: %w", err)
 	}
 
 	if s.proxyCfg.Mode == structs.ProxyModeTransparent {
@@ -672,4 +645,40 @@ func parseHCPMetricsConfig(m map[string]interface{}) (hcpMetricsConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+// maybeInitializeHCPMetricsWatches will initialize a synthetic upstream and discovery chain
+// watch for the HCP metrics collector, if metrics collection is enabled on the proxy registration.
+func (s *handlerConnectProxy) maybeInitializeHCPMetricsWatches(ctx context.Context, snap ConfigSnapshot) error {
+	hcpCfg, err := parseHCPMetricsConfig(s.proxyCfg.Config)
+	if err != nil {
+		s.logger.Error("failed to parse connect.proxy.config", "error", err)
+	}
+
+	if hcpCfg.HCPMetricsBindPort != 0 {
+		upstream := structs.Upstream{
+			DestinationNamespace: "",
+			DestinationPartition: s.proxyID.PartitionOrDefault(),
+			DestinationName:      api.HCPMetricsCollectorName,
+			LocalBindPort:        hcpCfg.HCPMetricsBindPort,
+			Config: map[string]interface{}{
+				"protocol": "grpc",
+			},
+		}
+		uid := NewUpstreamID(&upstream)
+		snap.ConnectProxy.UpstreamConfig[uid] = &upstream
+
+		err := s.dataSources.CompiledDiscoveryChain.Notify(ctx, &structs.DiscoveryChainRequest{
+			Datacenter:           s.source.Datacenter,
+			QueryOptions:         structs.QueryOptions{Token: s.token},
+			Name:                 upstream.DestinationName,
+			EvaluateInDatacenter: s.source.Datacenter,
+			EvaluateInNamespace:  uid.NamespaceOrDefault(),
+			EvaluateInPartition:  uid.PartitionOrDefault(),
+		}, "discovery-chain:"+uid.String(), s.ch)
+		if err != nil {
+			return fmt.Errorf("failed to watch discovery chain for %s: %v", uid.String(), err)
+		}
+	}
+	return nil
 }
